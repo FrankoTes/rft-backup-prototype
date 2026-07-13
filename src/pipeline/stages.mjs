@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, stat, copyFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { createRftPackage } from './package.mjs';
+import { createTransport } from '../transport/index.mjs';
 
 async function walk(folder) {
   const out = [];
@@ -93,24 +94,38 @@ export class RftPackageStage {
   }
 }
 
-export class LocalSftpTransferStage {
+export class TransferStage {
   name = 'Transfer';
+
+  constructor(transportFactory = createTransport) {
+    this.transportFactory = transportFactory;
+  }
 
   async run(ctx) {
     if (!ctx.packagePath) throw new Error('Package missing');
 
-    await mkdir(ctx.configuration.destination.remotePath, { recursive: true });
-    ctx.remotePackagePath = path.join(ctx.configuration.destination.remotePath, path.basename(ctx.packagePath));
-    await copyFile(ctx.packagePath, ctx.remotePackagePath);
-    ctx.logs.user.push('Sauvegarde envoyée vers la destination SFTP.');
+    const transport = this.transportFactory(ctx.configuration.destination);
+    const transfer = await transport.uploadPackage(ctx.packagePath);
+    ctx.remotePackagePath = transfer.remotePath;
+    ctx.remotePackageSize = transfer.size;
+    ctx.remoteHashValidated = transfer.hashValidated;
+    if (transfer.hashValidation) ctx.logs.technical.push(transfer.hashValidation);
+    ctx.logs.user.push('Sauvegarde envoyée vers la destination configurée.');
     return ctx;
   }
 }
+
+export class LocalSftpTransferStage extends TransferStage {}
 
 export class ValidationStage {
   name = 'Validation';
 
   async run(ctx) {
+    if (ctx.remoteHashValidated === false) {
+      ctx.logs.user.push('Présence et taille du package distant validées après transfert.');
+      return ctx;
+    }
+
     const remoteHash = await sha256(ctx.remotePackagePath);
 
     if (remoteHash !== ctx.packageHash) {
@@ -126,6 +141,11 @@ export class VersionManagementStage {
   name = 'Version Management';
 
   async run(ctx) {
+    if (ctx.configuration.destination.type !== 'local') {
+      ctx.logs.user.push(`Rétention distante non appliquée par ce prototype pour le transport ${ctx.configuration.destination.type ?? 'sftp'}.`);
+      return ctx;
+    }
+
     const versions = (await readdir(ctx.configuration.destination.remotePath))
       .filter((file) => file.endsWith('.rftpkg'))
       .sort()

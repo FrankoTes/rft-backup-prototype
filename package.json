@@ -1,7 +1,7 @@
 {
   "scripts": {
     "dev": "node src/ui/server.mjs",
-    "build": "node --check src/core/errors.mjs && node --check src/pipeline/package.mjs && node --check src/pipeline/stages.mjs && node --check src/pipeline/runner.mjs && node --check src/service/service.mjs && node --check src/ui/server.mjs",
+    "build": "node --check src/core/errors.mjs && node --check src/pipeline/package.mjs && node --check src/pipeline/stages.mjs && node --check src/pipeline/runner.mjs && node --check src/transport/errors.mjs && node --check src/transport/index.mjs && node --check src/transport/local.mjs && node --check src/transport/sftp.mjs && node --check src/service/service.mjs && node --check src/ui/server.mjs",
     "test": "node --test src/tests/*.test.mjs",
     "service": "node src/service/service.mjs"
   },
@@ -11,5 +11,8 @@
   "type": "module",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "ssh2-sftp-client": "^12.1.1"
   }
 }
