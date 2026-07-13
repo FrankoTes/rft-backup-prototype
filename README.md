@@ -58,6 +58,20 @@ Each package preserves:
 
 `src/pipeline/package.mjs` exposes `createRftPackage`, `readRftPackage` and `extractRftPackage`. The extraction helper is intentionally not a restore engine or GUI workflow; it exists to prove that packages are self-contained and to keep the future restore architecture simple.
 
+
+## Local UI controller API
+
+The demo UI now talks to a small local HTTP controller in `src/ui/server.mjs` instead of invoking pipeline stages directly from the browser. The development server explicitly binds to `127.0.0.1` and serves only files resolved inside `src/ui`. The controller delegates to `src/service/service.mjs`, which remains the source of truth for configurations, activity, saved versions and dashboard state. The service then invokes the existing backup pipeline and transport abstraction.
+
+Available prototype endpoints include:
+
+- `GET /api/state`, `GET /api/dashboard`, `GET /api/configurations`, `GET /api/activity` and `GET /api/versions` for read models used by the UI;
+- `POST /api/configurations`, `PUT /api/configurations/:id`, `DELETE /api/configurations/:id` for configuration management;
+- `POST /api/test-connection` for destination connectivity checks;
+- `POST /api/configurations/:id/backup` for immediate manual backup execution.
+
+API responses deliberately redact `destination.password`. Existing configurations therefore render the password input empty; leaving it empty during an edit keeps the existing password in the service state. This prototype still stores the secret in the local JSON state file so the end-to-end flow can run; secure secret storage is explicitly deferred to a dedicated future PR. Logs and public API responses must not include the password.
+
 ## Commands
 
 - `npm run dev` starts the desktop-style prototype UI in a browser.
