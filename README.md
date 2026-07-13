@@ -61,7 +61,7 @@ Each package preserves:
 
 ## Local UI controller API
 
-The demo UI now talks to a small local HTTP controller in `src/ui/server.mjs` instead of invoking pipeline stages directly from the browser. The controller delegates to `src/service/service.mjs`, which remains the source of truth for configurations, activity, saved versions and dashboard state. The service then invokes the existing backup pipeline and transport abstraction.
+The demo UI now talks to a small local HTTP controller in `src/ui/server.mjs` instead of invoking pipeline stages directly from the browser. The development server explicitly binds to `127.0.0.1` and serves only files resolved inside `src/ui`. The controller delegates to `src/service/service.mjs`, which remains the source of truth for configurations, activity, saved versions and dashboard state. The service then invokes the existing backup pipeline and transport abstraction.
 
 Available prototype endpoints include:
 

@@ -86,7 +86,11 @@ export async function dashboard() {
   const state = await loadState();
   const lastBackup = state.activity.find((a) => a.result !== 'running');
   const enabled = state.configurations.find((c) => c.enabled);
-  const protectedDataBytes = state.versions.reduce((sum, v) => sum + (v.totalBytes ?? 0), 0);
+  const latestBytesByConfiguration = new Map();
+  for (const version of [...state.versions].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))) {
+    if (!latestBytesByConfiguration.has(version.configurationId)) latestBytesByConfiguration.set(version.configurationId, version.totalBytes ?? 0);
+  }
+  const protectedDataBytes = [...latestBytesByConfiguration.values()].reduce((sum, bytes) => sum + bytes, 0);
   return {
     health: !lastBackup || lastBackup.result === 'success' ? 'healthy' : lastBackup.error?.severity === 'critical' ? 'critical' : 'warning',
     lastBackup,

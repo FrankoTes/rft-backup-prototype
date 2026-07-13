@@ -78,3 +78,60 @@ test('technical state file may contain a secret until secure storage PR, but pub
   assert.match(raw, /secret-password/);
   assert.equal(JSON.stringify(await mod.getPublicState()).includes('secret-password'), false);
 });
+
+
+test('normal UI startup binds only to 127.0.0.1', async (t) => {
+  const { root } = await withService(t);
+  process.env.RFT_DATA_DIR = path.join(root, 'data-bind');
+  const { startRftUiServer, UI_HOST } = await import(`../ui/server.mjs?bind-${Date.now()}`);
+  const server = startRftUiServer({ listenPort: 0 });
+  await new Promise((resolve) => server.once('listening', resolve));
+  t.after(() => server.close());
+  assert.equal(UI_HOST, '127.0.0.1');
+  assert.equal(server.address().address, '127.0.0.1');
+});
+
+test('static UI serving is rooted in src/ui and rejects invalid paths', async (t) => {
+  const { root } = await withService(t);
+  process.env.RFT_DATA_DIR = path.join(root, 'data-static');
+  const { createRftUiServer } = await import(`../ui/server.mjs?static-${Date.now()}`);
+  const server = createRftUiServer().listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  const rootResponse = await fetch(`${base}/`);
+  assert.equal(rootResponse.status, 200);
+  assert.match(await rootResponse.text(), /RFT Backup/);
+
+  const cssResponse = await fetch(`${base}/style.css`);
+  assert.equal(cssResponse.status, 200);
+  assert.match(cssResponse.headers.get('content-type'), /text\/css/);
+
+  const missingResponse = await fetch(`${base}/missing.css`);
+  assert.equal(missingResponse.status, 404);
+
+  const traversalResponse = await fetch(`${base}/..%2Fservice%2Fservice.mjs`);
+  assert.ok([403, 404].includes(traversalResponse.status));
+  assert.doesNotMatch(await traversalResponse.text(), /runBackup/);
+
+  const stateResponse = await fetch(`${base}/..%2F..%2F.rft-data%2Fstate.json`);
+  assert.ok([403, 404].includes(stateResponse.status));
+  assert.doesNotMatch(await stateResponse.text(), /configurations/);
+});
+
+test('dashboard protected data uses only the latest version for each configuration', async (t) => {
+  const { mod } = await withService(t);
+  await mod.saveState({
+    configurations: [{ id: 'cfg-a', name: 'A', enabled: true, folders: [], destination: { type: 'local', remotePath: '/tmp/a' }, retention: { type: 'keep_last', count: 2 } }],
+    activity: [],
+    connectionTests: {},
+    versions: [
+      { id: 'old', configurationId: 'cfg-a', createdAt: '2026-01-01T00:00:00.000Z', totalBytes: 100 },
+      { id: 'new', configurationId: 'cfg-a', createdAt: '2026-01-02T00:00:00.000Z', totalBytes: 150 },
+      { id: 'other', configurationId: 'cfg-b', createdAt: '2026-01-01T00:00:00.000Z', totalBytes: 25 },
+    ],
+  });
+
+  assert.equal((await mod.dashboard()).protectedDataBytes, 175);
+});
