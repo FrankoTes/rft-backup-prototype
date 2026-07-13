@@ -7,8 +7,9 @@ function requireString(value, name, secret) {
 }
 
 export class SftpTransport {
-  constructor(destination) {
+  constructor(destination, options = {}) {
     this.destination = { port: 22, timeoutMs: 15000, ...destination };
+    this.clientFactory = options.clientFactory;
   }
 
   async testConnection() {
@@ -32,13 +33,7 @@ export class SftpTransport {
 
   async #withClient(work) {
     this.#validate();
-    let SftpClient;
-    try {
-      ({ default: SftpClient } = await import('ssh2-sftp-client'));
-    } catch (error) {
-      throw new TransportError(TransportErrorCodes.INVALID_CONFIGURATION, 'Dépendance SFTP manquante: installez ssh2-sftp-client pour utiliser le transport SFTP.', { cause: error, secret: this.destination.password });
-    }
-    const client = new SftpClient();
+    const client = await this.#createClient();
     try {
       await client.connect({ host: this.destination.host, port: this.destination.port, username: this.destination.username, password: this.destination.password, readyTimeout: this.destination.timeoutMs });
       return await work(client);
@@ -47,6 +42,19 @@ export class SftpTransport {
     } finally {
       try { await client.end(); } catch {}
     }
+  }
+
+  async #createClient() {
+    if (this.clientFactory) return this.clientFactory();
+
+    let SftpClient;
+    try {
+      ({ default: SftpClient } = await import('ssh2-sftp-client'));
+    } catch (error) {
+      throw new TransportError(TransportErrorCodes.INVALID_CONFIGURATION, 'Dépendance SFTP manquante: installez ssh2-sftp-client pour utiliser le transport SFTP.', { cause: error, secret: this.destination.password });
+    }
+
+    return new SftpClient();
   }
 
   #validate() {

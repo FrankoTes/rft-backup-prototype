@@ -12,7 +12,7 @@
   "engines": {
     "node": ">=20"
   },
-  "optionalDependencies": {
-    "ssh2-sftp-client": "^11.0.0"
+  "dependencies": {
+    "ssh2-sftp-client": "^12.1.1"
   }
 }
