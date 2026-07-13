@@ -19,7 +19,7 @@ function configFor(sourceFolders, remote) {
     enabled: true,
     folders: sourceFolders.map((folder) => ({ path: folder, included: true })),
     schedule: { frequency: 'manual' },
-    destination: { host: 'localhost', port: 22, username: 'test', remotePath: remote },
+    destination: { type: 'local', host: 'localhost', port: 22, username: 'test', remotePath: remote },
     retention: { type: 'keep_last', count: 3 },
   };
 }
